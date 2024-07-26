@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ruokun Niu - CS 416 Narrative Visualization with D3.js</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="d3.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3-annotation/2.5.1/d3-annotation.min.js"></script>
+
+    <!-- <script type="text/javascript" src="d3.js"></script> -->
+</head>
+<body>
+    <div id='introduction'>
+        <h1 style="text-align:center">Exploring GDP per Capita and Different Types of Renewable Energy</h1>
+        <p>With the rise of Artificial Intelligence and LLM in the recent years,
+            countries worldwide are heavily investing in various resources to advance their AI capabilities, recognizing the strategic importance of artificial intelligence for economic growth and national security. Key investments include funding for research and development, developing more capable hardware (GPUs), and gathering robust datasets. However, one of the most crucial (and often underestimated) areas is energy. AI's computational demands are immense, requiring substantial energy to power data centers and advanced computational systems</p>
+        <p>This narrative visualization project explores the relationship between the GDP per Capita of a country and its level of renewable energy production, spanning from 2000 to 2018. The GDP data is based on Purchasing Power Parity (PPP).</p>
+
+        <p>Select a year using the dropdown box below to begin exploring.</p>
+    </div>
+
+    <div class="container">
+        <div class="controls">
+            <label for="year-select">Select Year:</label>
+            <select id="year-select">
+                <option value="" disabled selected>Select an option</option>
+                <option value="2000">2000</option>
+                <option value="2001">2001</option>
+                <option value="2002">2002</option>
+                <option value="2003">2003</option>
+                <option value="2004">2004</option>
+                <option value="2005">2005</option>
+                <option value="2006">2006</option>
+                <option value="2007">2007</option>
+                <option value="2008">2008</option>
+                <option value="2009">2009</option>
+                <option value="2010">2010</option>
+                <option value="2011">2011</option>
+                <option value="2012">2012</option>
+                <option value="2013">2013</option>
+                <option value="2014">2014</option>
+                <option value="2015">2015</option>
+                <option value="2016">2016</option>
+                <option value="2017">2017</option>
+                <option value="2018">2018</option>
+            </select>
+
+            <label for="energy-select">Select Energy Type:</label>
+            <select id="energy-select">
+                <option value="SolarEnergy">Solar</option>
+                <option value="WindEnergy">Wind</option>
+                <option value="HydroEnergy">Hydro</option>
+                <option value="TotalEnergy">Total</option>
+            </select>
+        </div>
+    </div>
+    
+
+    <!-- <button id="intro" onclick="projectSolarScatterPlot(2000)">Begin</button> -->
+    <div id="scatterplot"></div> 
+
+    <script>
+        var global_year = 2000;
+        var global_energy_type = "SolarEnergy";
+
+
+        var minGDP = 987;
+        var maxGDP = 70000;
+        function projectSolarScatterPlot(currentYear) {
+            console.log("currentYear:", currentYear);
+            const margin = { top: 10, right: 30, bottom: 50, left: 60 },
+                width = 800 - margin.left - margin.right,
+                height = 600 - margin.top - margin.bottom;
+            var minEnergy = 100;
+            var maxEnergy = 1170;
+            var myColor = d3.scaleOrdinal().domain(["USA", "China", "India", "Brazil", "Germany", "UK", "France", "Italy", "Canada", "Australia"]).range(["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"]);
+            const svg = d3.select("#scatterplot")
+                .append("svg")
+                .attr("width", 1000)
+                .attr("height", 700)
+                .append("g")
+                .attr("transform", `translate(${margin.left},${margin.top})`);
+
+            // Load both CSV files
+            Promise.all([
+                d3.csv("data/filtered_GDP_per_capita.csv"),
+                d3.csv("data/global_renewable_energy_production.csv")
+            ]).then(([gdpData, energyData]) => {
+                gdpData = gdpData.filter(d => +d.Year === currentYear);
+                gdpData.forEach(d => {
+                d.Year = +d.Year;
+                d.GDPperCapita = +d.GDPperCapita;
+                });
+                
+
+                // Prepare energy data
+                energyData.forEach(d => {
+                d.Year = +d.Year;
+                d.SolarEnergy = +d.SolarEnergy;
+                });
+
+                // Merge datasets based on Year and Country
+                const mergedData = gdpData.map(gdpItem => {
+                const energyItem = energyData.find(e => e.Country === gdpItem.Country && e.Year === gdpItem.Year);
+                return {
+                    ...gdpItem,
+                    ...energyItem
+                };
+                }); // Filter out any data without SolarEnergy
+
+                console.log("Merged Data:", mergedData);
+
+                // Add X axis for GDP per Capita
+                const x = d3.scaleLog().base(10).domain([minGDP, maxGDP]).range([0, width]);
+                svg.append("g")
+                .attr("transform", `translate(0,${height})`)
+                .call(d3.axisBottom(x))
+                .append("text")
+                .attr("y", 40)
+                .attr("x", width / 2)
+                .attr("text-anchor", "middle")
+                .attr("fill", "black")
+                .text("GDP per Capita (PPP)");
+
+                // Add Y axis for Solar Energy
+                const y = d3.scaleLog().base(10).domain([minEnergy, maxEnergy]).range([height, 0]);
+                svg.append("g")
+                .call(d3.axisLeft(y))
+                .append("text")
+                .attr("transform", "rotate(-90)")
+                .attr("y", -40)
+                .attr("x", -height / 2)
+                .attr("dy", "1em")
+                .attr("text-anchor", "middle")
+                .attr("fill", "black")
+                .text("Solar Energy Production(GWh)");
+
+                // Add a scale for bubble size
+                const z = d3.scaleSqrt()
+                .domain([0, d3.max(mergedData, d => d.SolarEnergy)])
+                .range([2, 20]);
+
+                // Add dots
+                svg.append('g')
+                .selectAll("circle")
+                .data(mergedData)
+                .enter()
+                .append("circle")
+                .attr("class", "dot")
+                .attr("cx", d => x(d.GDPperCapita))
+                .attr("cy", d => y(d.SolarEnergy))
+                .attr("r", d => z(d.SolarEnergy))
+                .attr('fill', d => myColor(d))
+                .attr("opacity", 0.7);
+
+                // Add labels
+                svg.selectAll("text.label")
+                .data(mergedData)
+                .enter()
+                .append("text")
+                .attr("class", "label")
+                .attr("x", d => x(d.GDPperCapita) + z(d.SolarEnergy) * 1.02)  // Adjust x position
+                .attr("y", d => y(d.SolarEnergy) - z(d.SolarEnergy) * 1.02)  // Adjust y position
+                .attr("dy", "0.35em")
+                .attr("text-anchor", "start")
+                .text(d => d['Country Code'])  // Use country code
+                .style("font-size", "10px")
+                .style("fill", "black");
+
+                let max_energy = mergedData.reduce((max, p) => p.SolarEnergy > max ? p.SolarEnergy : max, mergedData[0].SolarEnergy);
+                let min_energy = mergedData.reduce((min, p) => p.SolarEnergy < min ? p.SolarEnergy : min, mergedData[0].SolarEnergy);
+
+
+                let max_data_point = mergedData.find(d => d.SolarEnergy === max_energy);
+                let min_data_point = mergedData.find(d => d.SolarEnergy === min_energy);
+
+
+                let annotations = [
+                    {
+                        note: {
+                            label: "Country: " + max_data_point["Country Code"] + ", GDP per Capita: " + max_data_point["GDPperCapita"],
+                            title: "Max Solar Energy"
+                        },
+                        x: 60,
+                        y: 20,
+                    },
+                    {
+                        note: {
+                            label: "Country: " + min_data_point["Country Code"] + ", GDP per Capita: " + min_data_point["GDPperCapita"],
+                            title: "Min Solar Energy"
+                        },
+                        x: 60,
+                        y: 430,
+                    }
+                ];
+
+                // do a line that connectsion annotation to point
+                
+                const makeAnnotations = d3.annotation()
+                    .type(d3.annotationLabel)
+                    .annotations(annotations);
+
+
+
+                svg.append("g")
+                    .attr("class", "annotation-group")
+                    .call(makeAnnotations);
+
+
+            }).catch(error => {
+                console.error("Error loading data:", error); // Log errors if data loading fails
+            });
+
+        }
+
+
+
+        function projectWindScatterPlot(currentYear) {
+            console.log("currentYear:", currentYear);
+            const margin = { top: 10, right: 30, bottom: 50, left: 60 },
+                width = 800 - margin.left - margin.right,
+                height = 600 - margin.top - margin.bottom;
+            var minEnergy = 100;
+            var maxEnergy = 2000;
+
+            var myColor = d3.scaleOrdinal().domain(["USA", "China", "India", "Brazil", "Germany", "UK", "France", "Italy", "Canada", "Australia"]).range(["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"]);
+            const svg = d3.select("#scatterplot")
+                .append("svg")
+                .attr("width", width + margin.left + margin.right)
+                .attr("height", height + margin.top + margin.bottom)
+                .append("g")
+                .attr("transform", `translate(${margin.left},${margin.top})`);
+
+            // Load both CSV files
+            Promise.all([
+                d3.csv("data/filtered_GDP_per_capita.csv"),
+                d3.csv("data/global_renewable_energy_production.csv")
+            ]).then(([gdpData, energyData]) => {
+                // Filter GDP data by currentYear
+                console.log("currentYear:", currentYear);
+                gdpData = gdpData.filter(d => +d.Year === currentYear);
+                gdpData.forEach(d => {
+                d.Year = +d.Year;
+                d.GDPperCapita = +d.GDPperCapita;
+                });
+                
+
+                // Prepare energy data
+                energyData.forEach(d => {
+                d.Year = +d.Year;
+                d.WindEnergy = +d.WindEnergy;
+                });
+
+                // Merge datasets based on Year and Country
+                const mergedData = gdpData.map(gdpItem => {
+                const energyItem = energyData.find(e => e.Country === gdpItem.Country && e.Year === gdpItem.Year);
+                return {
+                    ...gdpItem,
+                    ...energyItem
+                };
+                }); // Filter out any data without SolarEnergy
+                // Add X axis for GDP per Capita
+                const x = d3.scaleLog().base(10).domain([minGDP, maxGDP]).range([0, width]);
+                svg.append("g")
+                .attr("transform", `translate(0,${height})`)
+                .call(d3.axisBottom(x))
+                .append("text")
+                .attr("y", 40)
+                .attr("x", width / 2)
+                .attr("text-anchor", "middle")
+                .attr("fill", "black")
+                .text("GDP per Capita (PPP)");
+
+                // Add Y axis for Solar Energy
+                const y = d3.scaleLog().base(10).domain([minEnergy, maxEnergy]).range([height, 0]);
+                svg.append("g")
+                .call(d3.axisLeft(y))
+                .append("text")
+                .attr("transform", "rotate(-90)")
+                .attr("y", -40)
+                .attr("x", -height / 2)
+                .attr("dy", "1em")
+                .attr("text-anchor", "middle")
+                .attr("fill", "black")
+                .text("Wind Energy Production (GWh)");
+
+                // Add a scale for bubble size
+                const z = d3.scaleSqrt()
+                .domain([0, d3.max(mergedData, d => d.WindEnergy)])
+                .range([2, 20]);
+
+                // Add dots
+                svg.append('g')
+                .selectAll("circle")
+                .data(mergedData)
+                .enter()
+                .append("circle")
+                .attr("class", "dot")
+                .attr("cx", d => x(d.GDPperCapita))
+                .attr("cy", d => y(d.WindEnergy))
+                .attr("r", d => z(d.WindEnergy))
+                .attr('fill', d => myColor(d))
+                .attr("opacity", 0.7);
+
+                // Add labels
+                svg.selectAll("text.label")
+                .data(mergedData)
+                .enter()
+                .append("text")
+                .attr("class", "label")
+                .attr("x", d => x(d.GDPperCapita) + z(d.WindEnergy) * 1.02)  // Adjust x position
+                .attr("y", d => y(d.WindEnergy) - z(d.WindEnergy) * 1.02)  // Adjust y position
+                .attr("dy", "0.35em")
+                .attr("text-anchor", "start")
+                .text(d => d['Country Code'])  // Use country code
+                .style("font-size", "10px")
+                .style("fill", "black");
+
+                let max_energy = mergedData.reduce((max, p) => p.WindEnergy > max ? p.WindEnergy : max, mergedData[0].WindEnergy);
+                let min_energy = mergedData.reduce((min, p) => p.WindEnergy < min ? p.WindEnergy : min, mergedData[0].WindEnergy);
+
+                let max_data_point = mergedData.find(d => d.WindEnergy === max_energy);
+                let min_data_point = mergedData.find(d => d.WindEnergy === min_energy);
+
+                let annotations = [
+                    {
+                        note: {
+                            label: "Country: " + max_data_point["Country Code"] + ", GDP per Capita: " + max_data_point["GDPperCapita"],
+                            title: "Max Wind Energy"
+                        },
+                        x: 60,
+                        y: 20,
+                    },
+                    {
+                        note: {
+                            label: "Country: " + min_data_point["Country Code"] + ", GDP per Capita: " + min_data_point["GDPperCapita"],
+                            title: "Min Wind Energy"
+                        },
+                        x: 60,
+                        y: 430,
+                    }
+                ];
+
+                
+                const makeAnnotations = d3.annotation()
+                    .type(d3.annotationLabel)
+                    .annotations(annotations);
+
+
+
+                svg.append("g")
+                    .attr("class", "annotation-group")
+                    .call(makeAnnotations);
+                
+
+            }).catch(error => {
+                console.error("Error loading data:", error); // Log errors if data loading fails
+            });
+        }
+
+        function projectHydroScatterPlot(currentYear) {
+            const margin = { top: 10, right: 30, bottom: 50, left: 60 },
+                width = 800 - margin.left - margin.right,
+                height = 600 - margin.top - margin.bottom;
+            var minEnergy = 100;
+            var maxEnergy = 2100;
+
+            var myColor = d3.scaleOrdinal().domain(["USA", "China", "India", "Brazil", "Germany", "UK", "France", "Italy", "Canada", "Australia"]).range(["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"]);
+            const svg = d3.select("#scatterplot")
+                .append("svg")
+                .attr("width", width + margin.left + margin.right)
+                .attr("height", height + margin.top + margin.bottom)
+                .append("g")
+                .attr("transform", `translate(${margin.left},${margin.top})`);
+
+            // Load both CSV files
+            Promise.all([
+                d3.csv("data/filtered_GDP_per_capita.csv"),
+                d3.csv("data/global_renewable_energy_production.csv")
+            ]).then(([gdpData, energyData]) => {
+                // Filter GDP data by currentYear
+                console.log("currentYear:", currentYear);
+                gdpData = gdpData.filter(d => +d.Year === currentYear);
+                gdpData.forEach(d => {
+                d.Year = +d.Year;
+                d.GDPperCapita = +d.GDPperCapita;
+                });
+                
+
+                // Prepare energy data
+                energyData.forEach(d => {
+                d.Year = +d.Year;
+                d.HydroEnergy = +d.HydroEnergy;
+                });
+
+                // Merge datasets based on Year and Country
+                const mergedData = gdpData.map(gdpItem => {
+                const energyItem = energyData.find(e => e.Country === gdpItem.Country && e.Year === gdpItem.Year);
+                return {
+                    ...gdpItem,
+                    ...energyItem
+                };
+                }); // Filter out any data without SolarEnergy
+                // Add X axis for GDP per Capita
+                const x = d3.scaleLog().base(10).domain([minGDP, maxGDP]).range([0, width]);
+                svg.append("g")
+                .attr("transform", `translate(0,${height})`)
+                .call(d3.axisBottom(x))
+                .append("text")
+                .attr("y", 40)
+                .attr("x", width / 2)
+                .attr("text-anchor", "middle")
+                .attr("fill", "black")
+                .text("GDP per Capita (PPP)");
+
+                // Add Y axis for Solar Energy
+                const y = d3.scaleLog().base(10).domain([minEnergy, maxEnergy]).range([height, 0]);
+                svg.append("g")
+                .call(d3.axisLeft(y))
+                .append("text")
+                .attr("transform", "rotate(-90)")
+                .attr("y", -40)
+                .attr("x", -height / 2)
+                .attr("dy", "1em")
+                .attr("text-anchor", "middle")
+                .attr("fill", "black")
+                .text("Hydro Energy Production (GWh)");
+
+                // Add a scale for bubble size
+                const z = d3.scaleSqrt()
+                .domain([0, d3.max(mergedData, d => d.HydroEnergy)])
+                .range([2, 20]);
+
+                // Add dots
+                svg.append('g')
+                .selectAll("circle")
+                .data(mergedData)
+                .enter()
+                .append("circle")
+                .attr("class", "dot")
+                .attr("cx", d => x(d.GDPperCapita))
+                .attr("cy", d => y(d.HydroEnergy))
+                .attr("r", d => z(d.HydroEnergy))
+                .attr('fill', d => myColor(d))
+                .attr("opacity", 0.7);
+
+                // Add labels
+                svg.selectAll("text.label")
+                .data(mergedData)
+                .enter()
+                .append("text")
+                .attr("class", "label")
+                .attr("x", d => x(d.GDPperCapita) + z(d.HydroEnergy) * 1.02)  // Adjust x position
+                .attr("y", d => y(d.HydroEnergy) - z(d.HydroEnergy) * 1.02)  // Adjust y position
+                .attr("dy", "0.35em")
+                .attr("text-anchor", "start")
+                .text(d => d['Country Code'])  // Use country code
+                .style("font-size", "10px")
+                .style("fill", "black");
+
+                let max_energy = mergedData.reduce((max, p) => p.HydroEnergy > max ? p.HydroEnergy : max, mergedData[0].HydroEnergy);
+                let min_energy = mergedData.reduce((min, p) => p.HydroEnergy < min ? p.HydroEnergy : min, mergedData[0].HydroEnergy);
+
+                let max_data_point = mergedData.find(d => d.HydroEnergy === max_energy);
+                let min_data_point = mergedData.find(d => d.HydroEnergy === min_energy);
+
+                let annotations = [
+                    {
+                        note: {
+                            label: "Country: " + max_data_point["Country Code"] + ", GDP per Capita: " + max_data_point["GDPperCapita"],
+                            title: "Max Hydro Energy"
+                        },
+                        x: 60,
+                        y: 20,
+                    },
+                    {
+                        note: {
+                            label: "Country: " + min_data_point["Country Code"] + ", GDP per Capita: " + min_data_point["GDPperCapita"],
+                            title: "Min Hydro Energy"
+                        },
+                        x: 60,
+                        y: 430,
+                    }
+                ];
+
+                
+                const makeAnnotations = d3.annotation()
+                    .type(d3.annotationLabel)
+                    .annotations(annotations);
+
+
+
+                svg.append("g")
+                    .attr("class", "annotation-group")
+                    .call(makeAnnotations);
+                
+            }).catch(error => {
+                console.error("Error loading data:", error); // Log errors if data loading fails
+            });
+        }
+
+
+        function projectTotalScatterPlot(currentYear) {
+            const margin = { top: 10, right: 30, bottom: 50, left: 60 },
+                width = 800 - margin.left - margin.right,
+                height = 600 - margin.top - margin.bottom;
+            var minEnergy = 1000;
+            var maxEnergy = 5000;
+
+            var myColor = d3.scaleOrdinal().domain(["USA", "China", "India", "Brazil", "Germany", "UK", "France", "Italy", "Canada", "Australia"]).range(["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"]);
+            const svg = d3.select("#scatterplot")
+                .append("svg")
+                .attr("width", width + margin.left + margin.right)
+                .attr("height", height + margin.top + margin.bottom)
+                .append("g")
+                .attr("transform", `translate(${margin.left},${margin.top})`);
+
+            // Load both CSV files
+            Promise.all([
+                d3.csv("data/filtered_GDP_per_capita.csv"),
+                d3.csv("data/global_renewable_energy_production.csv")
+            ]).then(([gdpData, energyData]) => {
+                // Filter GDP data by currentYear
+                console.log("currentYear:", currentYear);
+                gdpData = gdpData.filter(d => +d.Year === currentYear);
+                gdpData.forEach(d => {
+                d.Year = +d.Year;
+                d.GDPperCapita = +d.GDPperCapita;
+                });
+                
+
+                // Prepare energy data
+                energyData.forEach(d => {
+                d.Year = +d.Year;
+                d.TotalRenewableEnergy = +d.TotalRenewableEnergy;
+                });
+
+                // Merge datasets based on Year and Country
+                const mergedData = gdpData.map(gdpItem => {
+                const energyItem = energyData.find(e => e.Country === gdpItem.Country && e.Year === gdpItem.Year);
+                return {
+                    ...gdpItem,
+                    ...energyItem
+                };
+                }); // Filter out any data without SolarEnergy
+                // Add X axis for GDP per Capita
+                const x = d3.scaleLog().base(10).domain([minGDP, maxGDP]).range([0, width]);
+                svg.append("g")
+                .attr("transform", `translate(0,${height})`)
+                .call(d3.axisBottom(x))
+                .append("text")
+                .attr("y", 40)
+                .attr("x", width / 2)
+                .attr("text-anchor", "middle")
+                .attr("fill", "black")
+                .text("GDP per Capita (PPP)");
+
+                // Add Y axis for Solar Energy
+                const y = d3.scaleLog().base(10).domain([minEnergy, maxEnergy]).range([height, 0]);
+                svg.append("g")
+                .call(d3.axisLeft(y))
+                .append("text")
+                .attr("transform", "rotate(-90)")
+                .attr("y", -40)
+                .attr("x", -height / 2)
+                .attr("dy", "1em")
+                .attr("text-anchor", "middle")
+                .attr("fill", "black")
+                .text("Total Renewable Energy Production (GWh)");
+
+                // Add a scale for bubble size
+                const z = d3.scaleSqrt()
+                .domain([0, d3.max(mergedData, d => d.TotalRenewableEnergy)])
+                .range([2, 20]);
+
+                // Add dots
+                svg.append('g')
+                .selectAll("circle")
+                .data(mergedData)
+                .enter()
+                .append("circle")
+                .attr("class", "dot")
+                .attr("cx", d => x(d.GDPperCapita))
+                .attr("cy", d => y(d.TotalRenewableEnergy))
+                .attr("r", d => z(d.TotalRenewableEnergy))
+                .attr('fill', d => myColor(d))
+                .attr("opacity", 0.7);
+
+                // Add labels
+                svg.selectAll("text.label")
+                .data(mergedData)
+                .enter()
+                .append("text")
+                .attr("class", "label")
+                .attr("x", d => x(d.GDPperCapita) + z(d.TotalRenewableEnergy) * 1.02)  // Adjust x position
+                .attr("y", d => y(d.TotalRenewableEnergy) - z(d.TotalRenewableEnergy) * 1.02)  // Adjust y position
+                .attr("dy", "0.35em")
+                .attr("text-anchor", "start")
+                .text(d => d['Country Code'])  // Use country code
+                .style("font-size", "10px")
+                .style("fill", "black");
+
+                let max_energy = mergedData.reduce((max, p) => p.TotalRenewableEnergy > max ? p.TotalRenewableEnergy : max, mergedData[0].TotalRenewableEnergy);
+                let min_energy = mergedData.reduce((min, p) => p.TotalRenewableEnergy < min ? p.TotalRenewableEnergy : min, mergedData[0].TotalRenewableEnergy);
+
+                let max_data_point = mergedData.find(d => d.TotalRenewableEnergy === max_energy);
+                let min_data_point = mergedData.find(d => d.TotalRenewableEnergy === min_energy);
+
+                let annotations = [
+                    {
+                        note: {
+                            label: "Country: " + max_data_point["Country Code"] + ", GDP per Capita: " + max_data_point["GDPperCapita"],
+                            title: "Max Total Renewable Energy"
+                        },
+                        x: 60,
+                        y: 20,
+                    },
+                    {
+                        note: {
+                            label: "Country: " + min_data_point["Country Code"] + ", GDP per Capita: " + min_data_point["GDPperCapita"],
+                            title: "Max Total Renewable Energy"
+                        },
+                        x: 60,
+                        y: 415,
+                    }
+                ];
+
+                
+                const makeAnnotations = d3.annotation()
+                    .type(d3.annotationLabel)
+                    .annotations(annotations);
+
+
+
+                svg.append("g")
+                    .attr("class", "annotation-group")
+                    .call(makeAnnotations);
+                
+            }).catch(error => {
+                console.error("Error loading data:", error); // Log errors if data loading fails
+            });
+        }
+    d3.select("#year-select").on("change", function() {
+        const selectedYear = +this.value;
+        const selectedEnergyType = d3.select("#energy-select").property("value");
+        console.log("Selected Year:", selectedYear);
+        d3.select("#scatterplot").select("svg").remove(); // Remove the existing plot
+        if (selectedEnergyType === "SolarEnergy") {
+            projectSolarScatterPlot(selectedYear); // Create a new plot with the filtered data
+        } else if (selectedEnergyType === "WindEnergy") {
+            projectWindScatterPlot(selectedYear); // Create a new plot with the filtered data
+        } else if (selectedEnergyType === "HydroEnergy") {
+            projectHydroScatterPlot(selectedYear); // Create a new plot with the filtered data
+        } else if (selectedEnergyType === "TotalEnergy") {
+            projectTotalScatterPlot(selectedYear); // Create a new plot with the filtered data
+        }
+        // projectSolarScatterPlot(selectedYear); // Create a new plot with the filtered data
+      });
+    d3.select("#energy-select").on("change", function() {
+        const selectedYear = +d3.select("#year-select").property("value");
+        const selectedEnergyType = this.value;
+
+        d3.select("#scatterplot").select("svg").remove(); // Remove the existing plot
+        if (selectedEnergyType === "SolarEnergy") {
+            projectSolarScatterPlot(global_year); // Create a new plot with the filtered data
+        } else if (selectedEnergyType === "WindEnergy") {
+            projectWindScatterPlot(global_year); // Create a new plot with the filtered data
+        } else if (selectedEnergyType === "HydroEnergy") {
+            projectHydroScatterPlot(global_year); // Create a new plot with the filtered data
+        } else if (selectedEnergyType === "TotalEnergy") {
+            projectTotalScatterPlot(global_year); // Create a new plot with the filtered data
+        }
+      });
+      </script>
+</body>
+</html>
